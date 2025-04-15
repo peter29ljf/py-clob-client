@@ -25,152 +25,196 @@ jobs:
         run: |
           cat > view_positions.py << 'EOF'
           #!/usr/bin/env python3
-          import os
-          import json
-          from py_clob_client.client import ClobClient
-          from py_clob_client.constants import POLYGON
+          #!/usr/bin/env python3
+import os
+import json
+from py_clob_client.client import ClobClient
+from py_clob_client.constants import POLYGON
 
-          def load_api_credentials(credentials_file=None):
-              """
-              加载API凭据，可以从文件或手动设置
-              """
-              if credentials_file and os.path.exists(credentials_file):
-                  try:
-                      with open(credentials_file, 'r') as f:
-                          return json.load(f)
-                  except Exception as e:
-                      print(f"无法从文件加载凭据: {str(e)}")
-              
-              # 如果文件不存在或加载失败，使用手动设置的凭据
-              return {
-                  "apiKey": "4f812fe9-b869-c71c-7afb-08f36a0365eb",
-                  "secret": "TW2vuAaOqb1cnfS2OJvnAM-LvLNUMIAurWi65BPco_I=",
-                  "passphrase": "bebaa3341759979518ec045595847d64f5b826413b0cdb485d46bd84fa0c951b"
-              }
+def load_api_credentials(credentials_file=None):
+    """
+    加载API凭据，可以从文件或手动设置
+    """
+    if credentials_file and os.path.exists(credentials_file):
+        try:
+            with open(credentials_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"无法从文件加载凭据: {str(e)}")
+    
+    # 如果文件不存在或加载失败，使用手动设置的凭据
+    return {
+        "apiKey": "4f812fe9-b869-c71c-7afb-08f36a0365eb",
+        "secret": "TW2vuAaOqb1cnfS2OJvnAM-LvLNUMIAurWi65BPco_I=",
+        "passphrase": "bebaa3341759979518ec045595847d64f5b826413b0cdb485d46bd84fa0c951b"
+    }
 
-          def get_client_info(private_key=None):
-              """
-              获取客户端信息，包括可用方法
-              """
-              # 配置客户端
-              host = "https://clob.polymarket.com"
-              
-              # 使用环境变量或直接设置的私钥
-              key = private_key or os.environ.get("PRIVATE_KEY")
-              
-              try:
-                  # 初始化客户端
-                  print("正在初始化Polymarket客户端...")
-                  client = ClobClient(
-                      host=host,
-                      key=key,
-                      chain_id=POLYGON
-                  )
-                  
-                  # 设置API凭据
-                  print("设置API凭据...")
-                  creds = load_api_credentials()
-                  client.set_api_creds(creds)
-                  
-                  # 显示客户端可用的方法
-                  print("\n可用的客户端方法:")
-                  methods = [method for method in dir(client) if not method.startswith('_')]
-                  for method in methods:
-                      print(f"- {method}")
-                  
-                  return client
-              except Exception as e:
-                  print(f"初始化客户端时出错: {str(e)}")
-                  import traceback
-                  print(traceback.format_exc())
-                  return None
+def get_client_info(private_key=None):
+    """
+    获取客户端信息，包括可用方法
+    """
+    # 配置客户端
+    host = "https://clob.polymarket.com"
+    
+    # 使用环境变量或直接设置的私钥
+    key = private_key or os.environ.get("PRIVATE_KEY")
+    
+    try:
+        # 初始化客户端
+        print("正在初始化Polymarket客户端...")
+        client = ClobClient(
+            host=host,
+            key=key,
+            chain_id=POLYGON
+        )
+        
+        # 设置API凭据
+        print("设置API凭据...")
+        creds = load_api_credentials()
+        client.set_api_creds(creds)
+        
+        # 显示客户端可用的方法
+        print("\n可用的客户端方法:")
+        methods = [method for method in dir(client) if not method.startswith('_')]
+        for method in methods:
+            print(f"- {method}")
+        
+        return client
+    except Exception as e:
+        print(f"初始化客户端时出错: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return None
 
-          def explore_api(client):
-              """
-              探索API可用的功能
-              """
-              if not client:
-                  print("客户端未初始化，无法探索API")
-                  return
-              
-              try:
-                  print("\n=== 探索Polymarket API ===")
-                  
-                  # 尝试获取市场信息
-                  print("\n尝试获取市场信息...")
-                  if hasattr(client, 'get_markets'):
-                      markets = client.get_markets()
-                      print(f"市场信息: {json.dumps(markets[:3] if markets else [], indent=2)}")  # 只显示前3个市场
-                  else:
-                      print("客户端没有get_markets方法")
-                  
-                  # 尝试获取订单簿
-                  print("\n尝试获取订单簿...")
-                  if hasattr(client, 'get_order_book'):
-                      # 使用一个示例token_id
-                      token_id = "71321045679252212594626385532706912750332728571942532289631379312455583992563"
-                      try:
-                          orderbook = client.get_order_book(token_id)
-                          print(f"订单簿: {json.dumps(orderbook, indent=2)}")
-                      except Exception as e:
-                          print(f"获取订单簿时出错: {str(e)}")
-                  else:
-                      print("客户端没有get_order_book方法")
-                  
-                  # 尝试获取用户信息
-                  print("\n尝试获取用户信息...")
-                  if hasattr(client, 'get_user'):
-                      try:
-                          user_info = client.get_user()
-                          print(f"用户信息: {json.dumps(user_info, indent=2)}")
-                      except Exception as e:
-                          print(f"获取用户信息时出错: {str(e)}")
-                  else:
-                      print("客户端没有get_user方法")
-                  
-                  # 尝试获取账户余额
-                  print("\n尝试获取账户余额...")
-                  if hasattr(client, 'get_balance'):
-                      try:
-                          balance = client.get_balance()
-                          print(f"账户余额: {json.dumps(balance, indent=2)}")
-                      except Exception as e:
-                          print(f"获取账户余额时出错: {str(e)}")
-                  else:
-                      print("客户端没有get_balance方法")
-                  
-                  # 尝试获取交易历史
-                  print("\n尝试获取交易历史...")
-                  if hasattr(client, 'get_trades') or hasattr(client, 'get_user_trades'):
-                      method = 'get_trades' if hasattr(client, 'get_trades') else 'get_user_trades'
-                      try:
-                          trades = getattr(client, method)()
-                          print(f"交易历史: {json.dumps(trades[:3] if trades else [], indent=2)}")  # 只显示前3条
-                      except Exception as e:
-                          print(f"获取交易历史时出错: {str(e)}")
-                  else:
-                      print("客户端没有获取交易历史的方法")
-                      
-              except Exception as e:
-                  print(f"探索API时出错: {str(e)}")
-                  import traceback
-                  print(traceback.format_exc())
+def safe_json_dump(obj):
+    """安全地将对象转换为JSON字符串"""
+    try:
+        return json.dumps(obj, indent=2)
+    except (TypeError, OverflowError):
+        # 如果对象不能直接序列化为JSON
+        if isinstance(obj, (list, tuple)):
+            # 尝试一个元素一个元素地序列化
+            result = []
+            for item in obj:
+                try:
+                    result.append(f"{item}")
+                except:
+                    result.append("无法序列化的项目")
+            return str(result)
+        else:
+            # 返回对象的字符串表示
+            return str(obj)
 
-          def main():
-              """主函数"""
-              print("=== Polymarket API探索工具 ===")
-              
-              # 初始化客户端
-              client = get_client_info()
-              
-              if client:
-                  # 探索API功能
-                  explore_api(client)
-                  
-                  print("\n探索完成，详细信息请查看上面的输出")
+def explore_api(client):
+    """
+    探索API可用的功能
+    """
+    if not client:
+        print("客户端未初始化，无法探索API")
+        return
+    
+    try:
+        print("\n=== 探索Polymarket API ===")
+        
+        # 尝试获取市场信息
+        print("\n尝试获取市场信息...")
+        if hasattr(client, 'get_markets'):
+            try:
+                markets = client.get_markets()
+                print(f"市场数据类型: {type(markets)}")
+                if markets:
+                    print(f"市场信息: {safe_json_dump(markets)}")
+                else:
+                    print("没有获取到市场信息")
+            except Exception as e:
+                print(f"获取市场信息时出错: {str(e)}")
+        else:
+            print("客户端没有get_markets方法")
+        
+        # 尝试获取所有订单
+        print("\n尝试获取所有订单...")
+        if hasattr(client, 'get_orders'):
+            try:
+                orders = client.get_orders()
+                print(f"订单数据类型: {type(orders)}")
+                if orders:
+                    print(f"订单信息: {safe_json_dump(orders)}")
+                else:
+                    print("没有获取到订单信息")
+            except Exception as e:
+                print(f"获取订单信息时出错: {str(e)}")
+        else:
+            print("客户端没有get_orders方法")
+        
+        # 尝试获取特定token_id的订单簿
+        print("\n尝试获取订单簿...")
+        if hasattr(client, 'get_order_book'):
+            # 使用一个示例token_id
+            token_id = "71321045679252212594626385532706912750332728571942532289631379312455583992563"
+            try:
+                orderbook = client.get_order_book(token_id)
+                print(f"订单簿数据类型: {type(orderbook)}")
+                if orderbook:
+                    print(f"订单簿信息: {safe_json_dump(orderbook)}")
+                else:
+                    print("没有获取到订单簿信息")
+            except Exception as e:
+                print(f"获取订单簿时出错: {str(e)}")
+        else:
+            print("客户端没有get_order_book方法")
+        
+        # 尝试获取余额信息
+        print("\n尝试获取余额信息...")
+        if hasattr(client, 'get_balances'):
+            try:
+                balances = client.get_balances()
+                print(f"余额数据类型: {type(balances)}")
+                if balances:
+                    print(f"余额信息: {safe_json_dump(balances)}")
+                else:
+                    print("没有获取到余额信息")
+            except Exception as e:
+                print(f"获取余额信息时出错: {str(e)}")
+        else:
+            print("客户端没有get_balances方法")
+            
+        # 尝试获取用户持仓
+        print("\n尝试获取用户持仓...")
+        for method_name in ['get_positions', 'get_user_positions', 'get_portfolio']:
+            if hasattr(client, method_name):
+                try:
+                    print(f"尝试调用方法: {method_name}")
+                    positions = getattr(client, method_name)()
+                    print(f"持仓数据类型: {type(positions)}")
+                    if positions:
+                        print(f"持仓信息: {safe_json_dump(positions)}")
+                    else:
+                        print("没有获取到持仓信息")
+                except Exception as e:
+                    print(f"调用{method_name}方法时出错: {str(e)}")
+            else:
+                print(f"客户端没有{method_name}方法")
+                    
+    except Exception as e:
+        print(f"探索API时出错: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
 
-          if __name__ == "__main__":
-              main()
+def main():
+    """主函数"""
+    print("=== Polymarket API探索工具 ===")
+    
+    # 初始化客户端
+    client = get_client_info()
+    
+    if client:
+        # 探索API功能
+        explore_api(client)
+        
+        print("\n探索完成，详细信息请查看上面的输出")
+
+if __name__ == "__main__":
+    main()
           EOF
           
       - name: Run position viewing script
