@@ -1,0 +1,126 @@
+name: View Polymarket Positions
+
+on:
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  view-positions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install py-clob-client
+      
+      - name: Create position viewing script
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        run: |
+          cat > view_positions.py << 'EOF'
+          #!/usr/bin/env python3
+          import os
+          import json
+          from py_clob_client.client import ClobClient
+          from py_clob_client.constants import POLYGON
+
+          def load_api_credentials(credentials_file=None):
+              """
+              加载API凭据，可以从文件或手动设置
+              """
+              if credentials_file and os.path.exists(credentials_file):
+                  try:
+                      with open(credentials_file, 'r') as f:
+                          return json.load(f)
+                  except Exception as e:
+                      print(f"无法从文件加载凭据: {str(e)}")
+              
+              # 如果文件不存在或加载失败，使用手动设置的凭据
+              return {
+                  "apiKey": "4f812fe9-b869-c71c-7afb-08f36a0365eb",
+                  "secret": "TW2vuAaOqb1cnfS2OJvnAM-LvLNUMIAurWi65BPco_I=",
+                  "passphrase": "bebaa3341759979518ec045595847d64f5b826413b0cdb485d46bd84fa0c951b"
+              }
+
+          def get_positions(private_key=None):
+              """
+              获取当前持仓信息
+              """
+              # 配置客户端
+              host = "https://clob.polymarket.com"
+              
+              # 使用环境变量或直接设置的私钥
+              key = private_key or os.environ.get("PRIVATE_KEY")
+              
+              try:
+                  # 初始化客户端
+                  print("正在初始化Polymarket客户端...")
+                  client = ClobClient(
+                      host=host,
+                      key=key,
+                      chain_id=POLYGON
+                  )
+                  
+                  # 设置API凭据
+                  print("设置API凭据...")
+                  creds = load_api_credentials()
+                  client.set_api_creds(creds)
+                  
+                  # 获取持仓信息
+                  print("获取持仓信息...")
+                  positions = client.get_positions()
+                  
+                  # 打印详细的响应信息以供调试
+                  print(f"原始响应: {json.dumps(positions, indent=2)}")
+                  
+                  # 打印持仓详情
+                  if positions:
+                      print("\n=== 持仓信息 ===")
+                      for position in positions:
+                          print(f"\n持仓项目: {json.dumps(position, indent=2)}")
+                      
+                      # 尝试计算总价值（如果格式允许）
+                      try:
+                          total_value = sum(float(p.get("valueUsdc", 0)) for p in positions)
+                          print(f"\n总价值(USDC): {total_value}")
+                      except:
+                          print("无法计算总价值，响应格式不符合预期")
+                  else:
+                      print("没有找到任何持仓")
+                      
+                  return positions
+              except Exception as e:
+                  print(f"获取持仓信息时出错: {str(e)}")
+                  # 提供更详细的异常信息以帮助调试
+                  import traceback
+                  print(traceback.format_exc())
+                  return None
+
+          def main():
+              """主函数"""
+              print("=== Polymarket持仓查询工具 ===")
+              
+              # 从环境变量获取私钥
+              positions = get_positions()
+              
+              if positions:
+                  # 保存持仓信息到文件
+                  with open("polymarket_positions.json", "w") as f:
+                      json.dump(positions, f, indent=2)
+                  print("\n持仓信息已保存到 polymarket_positions.json 文件")
+
+          if __name__ == "__main__":
+              main()
+          EOF
+          
+      - name: Run position viewing script
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        run: |
+          python view_positions.py
