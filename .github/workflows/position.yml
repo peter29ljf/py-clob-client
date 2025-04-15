@@ -19,159 +19,90 @@ jobs:
           python -m pip install --upgrade pip
           pip install py-clob-client
       
-      - name: Create API exploration script
+      - name: Create API exploration script - Part 1
         run: |
-          python -c "
-import sys
-script = '''#!/usr/bin/env python3
-import os
-import json
-import time
-from py_clob_client.client import ClobClient
-from py_clob_client.constants import POLYGON
-from py_clob_client.clob_types import OrderArgs
-from py_clob_client.order_builder.constants import BUY, SELL
-
-def load_api_credentials(credentials_file=None):
-    \"\"\"
-    加载API凭据，可以从文件或手动设置
-    \"\"\"
-    if credentials_file and os.path.exists(credentials_file):
-        try:
-            with open(credentials_file, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f\"无法从文件加载凭据: {str(e)}\")
-    
-    # 如果文件不存在或加载失败，使用手动设置的凭据
-    return {
-        \"apiKey\": \"4f812fe9-b869-c71c-7afb-08f36a0365eb\",
-        \"secret\": \"TW2vuAaOqb1cnfS2OJvnAM-LvLNUMIAurWi65BPco_I=\",
-        \"passphrase\": \"bebaa3341759979518ec045595847d64f5b826413b0cdb485d46bd84fa0c951b\"
-    }
-
-def get_client(private_key=None):
-    \"\"\"
-    初始化并返回Polymarket客户端
-    \"\"\"
-    # 配置客户端
-    host = \"https://clob.polymarket.com\"
-    
-    # 使用环境变量或直接设置的私钥
-    key = private_key or os.environ.get(\"PRIVATE_KEY\")
-    
-    try:
-        # 初始化客户端
-        print(\"正在初始化Polymarket客户端...\")
-        client = ClobClient(
-            host=host,
-            key=key,
-            chain_id=POLYGON
-        )
-        
-        # 设置API凭据
-        print(\"设置API凭据...\")
-        creds = load_api_credentials()
-        client.set_api_creds(creds)
-        
-        print(f\"客户端初始化成功，地址: {client.address if hasattr(client, 'address') else '未知'}\")
-        return client
-    except Exception as e:
-        print(f\"初始化客户端时出错: {str(e)}\")
-        import traceback
-        print(traceback.format_exc())
-        return None
-
-def safe_json_dump(obj):
-    \"\"\"安全地将对象转换为JSON字符串\"\"\"
-    try:
-        return json.dumps(obj, indent=2)
-    except (TypeError, OverflowError):
-        # 如果对象不能直接序列化为JSON
-        if isinstance(obj, (list, tuple)):
-            # 尝试一个元素一个元素地序列化
-            result = []
-            for i, item in enumerate(obj):
-                if i >= 3:  # 只显示前3个元素
-                    result.append(\"... (更多项目)\")
-                    break
-                try:
-                    result.append(f\"{item}\")
-                except:
-                    result.append(\"无法序列化的项目\")
-            return str(result)
-        else:
-            # 返回对象的字符串表示
-            return str(obj)
-
-def list_available_methods(client):
-    \"\"\"列出客户端可用的所有方法\"\"\"
-    print(\"\\n=== 可用的客户端方法 ===\")
-    methods = [method for method in dir(client) if not method.startswith('_')]
-    methods.sort()  # 按字母顺序排序
-    
-    for method in methods:
-        print(f\"- {method}\")
-
-def explore_api(client):
-    \"\"\"探索API功能\"\"\"
-    if not client:
-        print(\"客户端未初始化，无法探索API\")
-        return
-    
-    try:
-        print(\"\\n=== 探索API功能 ===\")
-        
-        # 尝试所有客户端方法
-        methods = [method for method in dir(client) if not method.startswith('_') and callable(getattr(client, method))]
-        
-        for method_name in methods:
-            try:
-                print(f\"\\n尝试调用方法: {method_name}\")
-                
-                # 跳过需要参数的方法
-                if method_name in ['create_order', 'post_order', 'get_order_book', 'get_price', 'cancel_order']:
-                    print(f\"跳过需要参数的方法: {method_name}\")
-                    continue
-                
-                # 调用无参数方法
-                result = getattr(client, method_name)()
-                print(f\"{method_name}返回类型: {type(result)}\")
-                print(f\"{method_name}返回数据: {safe_json_dump(result)}\")
-                
-            except Exception as e:
-                print(f\"调用{method_name}方法时出错: {str(e)}\")
-    
-    except Exception as e:
-        print(f\"探索API时出错: {str(e)}\")
-        import traceback
-        print(traceback.format_exc())
-
-def main():
-    \"\"\"主函数\"\"\"
-    print(\"=== Polymarket API探索工具 ===\")
-    print(f\"当前时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\")
-    
-    # 初始化客户端
-    client = get_client()
-    
-    if client:
-        # 列出可用方法
-        list_available_methods(client)
-        
-        # 探索API功能
-        explore_api(client)
-        
-        print(\"\\n探索完成，详细信息请查看上面的输出\")
-    else:
-        print(\"客户端初始化失败，无法继续探索API\")
-
-if __name__ == \"__main__\":
-    main()
-'''
-with open('explore_api.py', 'w') as f:
-    f.write(script)
-          "
+          echo '#!/usr/bin/env python3' > explore_api.py
+          echo 'import os' >> explore_api.py
+          echo 'import json' >> explore_api.py
+          echo 'import time' >> explore_api.py
+          echo 'from py_clob_client.client import ClobClient' >> explore_api.py
+          echo 'from py_clob_client.constants import POLYGON' >> explore_api.py
+          echo 'from py_clob_client.clob_types import OrderArgs' >> explore_api.py
+          echo 'from py_clob_client.order_builder.constants import BUY, SELL' >> explore_api.py
+          echo '' >> explore_api.py
+          
+      - name: Create API exploration script - Part 2
+        run: |
+          echo 'def load_api_credentials(credentials_file=None):' >> explore_api.py
+          echo '    """' >> explore_api.py
+          echo '    加载API凭据，可以从文件或手动设置' >> explore_api.py
+          echo '    """' >> explore_api.py
+          echo '    return {' >> explore_api.py
+          echo '        "apiKey": "4f812fe9-b869-c71c-7afb-08f36a0365eb",' >> explore_api.py
+          echo '        "secret": "TW2vuAaOqb1cnfS2OJvnAM-LvLNUMIAurWi65BPco_I=",' >> explore_api.py
+          echo '        "passphrase": "bebaa3341759979518ec045595847d64f5b826413b0cdb485d46bd84fa0c951b"' >> explore_api.py
+          echo '    }' >> explore_api.py
+          echo '' >> explore_api.py
+          
+      - name: Create API exploration script - Part 3
+        run: |
+          echo 'def get_client():' >> explore_api.py
+          echo '    """初始化并返回Polymarket客户端"""' >> explore_api.py
+          echo '    host = "https://clob.polymarket.com"' >> explore_api.py
+          echo '    key = os.environ.get("PRIVATE_KEY")' >> explore_api.py
+          echo '    try:' >> explore_api.py
+          echo '        print("正在初始化Polymarket客户端...")' >> explore_api.py
+          echo '        client = ClobClient(host=host, key=key, chain_id=POLYGON)' >> explore_api.py
+          echo '        print("设置API凭据...")' >> explore_api.py
+          echo '        creds = load_api_credentials()' >> explore_api.py
+          echo '        client.set_api_creds(creds)' >> explore_api.py
+          echo '        return client' >> explore_api.py
+          echo '    except Exception as e:' >> explore_api.py
+          echo '        print(f"初始化客户端时出错: {str(e)}")' >> explore_api.py
+          echo '        return None' >> explore_api.py
+          echo '' >> explore_api.py
+          
+      - name: Create API exploration script - Part 4
+        run: |
+          echo 'def list_methods(client):' >> explore_api.py
+          echo '    """列出客户端可用的所有方法"""' >> explore_api.py
+          echo '    print("\\n=== 可用的客户端方法 ===")' >> explore_api.py
+          echo '    methods = [method for method in dir(client) if not method.startswith("_")]' >> explore_api.py
+          echo '    methods.sort()' >> explore_api.py
+          echo '    for method in methods:' >> explore_api.py
+          echo '        print(f"- {method}")' >> explore_api.py
+          echo '' >> explore_api.py
+          
+      - name: Create API exploration script - Part 5
+        run: |
+          echo 'def main():' >> explore_api.py
+          echo '    """主函数"""' >> explore_api.py
+          echo '    print("=== Polymarket API探索工具 ===")' >> explore_api.py
+          echo '    client = get_client()' >> explore_api.py
+          echo '    if client:' >> explore_api.py
+          echo '        list_methods(client)' >> explore_api.py
+          echo '        # 尝试执行一些无参数的方法' >> explore_api.py
+          echo '        try_methods = ["get_orders", "get_balances", "get_markets"]' >> explore_api.py
+          echo '        for method in try_methods:' >> explore_api.py
+          echo '            if hasattr(client, method):' >> explore_api.py
+          echo '                try:' >> explore_api.py
+          echo '                    print(f"\\n尝试执行{method}方法...")' >> explore_api.py
+          echo '                    result = getattr(client, method)()' >> explore_api.py
+          echo '                    print(f"结果类型: {type(result)}")' >> explore_api.py
+          echo '                    print(f"结果内容: {result}")' >> explore_api.py
+          echo '                except Exception as e:' >> explore_api.py
+          echo '                    print(f"执行{method}失败: {str(e)}")' >> explore_api.py
+          echo '            else:' >> explore_api.py
+          echo '                print(f"客户端没有{method}方法")' >> explore_api.py
+          echo '    else:' >> explore_api.py
+          echo '        print("客户端初始化失败")' >> explore_api.py
+          echo '' >> explore_api.py
+          echo 'if __name__ == "__main__":' >> explore_api.py
+          echo '    main()' >> explore_api.py
+          
+      - name: Show script content
+        run: |
+          cat explore_api.py
           
       - name: Run API exploration script
         env:
