@@ -20,266 +20,158 @@ jobs:
           pip install py-clob-client
       
       - name: Create API exploration script
-        env:
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
         run: |
-          cat > explore_api.py << 'EOF'
-          #!/usr/bin/env python3
-          import os
-          import json
-          import time
-          from py_clob_client.client import ClobClient
-          from py_clob_client.constants import POLYGON
-          from py_clob_client.clob_types import OrderArgs
-          from py_clob_client.order_builder.constants import BUY, SELL
+          python -c "
+import sys
+script = '''#!/usr/bin/env python3
+import os
+import json
+import time
+from py_clob_client.client import ClobClient
+from py_clob_client.constants import POLYGON
+from py_clob_client.clob_types import OrderArgs
+from py_clob_client.order_builder.constants import BUY, SELL
 
-          def load_api_credentials(credentials_file=None):
-              """
-              加载API凭据，可以从文件或手动设置
-              """
-              if credentials_file and os.path.exists(credentials_file):
-                  try:
-                      with open(credentials_file, 'r') as f:
-                          return json.load(f)
-                  except Exception as e:
-                      print(f"无法从文件加载凭据: {str(e)}")
-              
-              # 如果文件不存在或加载失败，使用手动设置的凭据
-              return {
-                  "apiKey": "4f812fe9-b869-c71c-7afb-08f36a0365eb",
-                  "secret": "TW2vuAaOqb1cnfS2OJvnAM-LvLNUMIAurWi65BPco_I=",
-                  "passphrase": "bebaa3341759979518ec045595847d64f5b826413b0cdb485d46bd84fa0c951b"
-              }
+def load_api_credentials(credentials_file=None):
+    \"\"\"
+    加载API凭据，可以从文件或手动设置
+    \"\"\"
+    if credentials_file and os.path.exists(credentials_file):
+        try:
+            with open(credentials_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f\"无法从文件加载凭据: {str(e)}\")
+    
+    # 如果文件不存在或加载失败，使用手动设置的凭据
+    return {
+        \"apiKey\": \"4f812fe9-b869-c71c-7afb-08f36a0365eb\",
+        \"secret\": \"TW2vuAaOqb1cnfS2OJvnAM-LvLNUMIAurWi65BPco_I=\",
+        \"passphrase\": \"bebaa3341759979518ec045595847d64f5b826413b0cdb485d46bd84fa0c951b\"
+    }
 
-          def get_client(private_key=None):
-              """
-              初始化并返回Polymarket客户端
-              """
-              # 配置客户端
-              host = "https://clob.polymarket.com"
-              
-              # 使用环境变量或直接设置的私钥
-              key = private_key or os.environ.get("PRIVATE_KEY")
-              
-              try:
-                  # 初始化客户端
-                  print("正在初始化Polymarket客户端...")
-                  client = ClobClient(
-                      host=host,
-                      key=key,
-                      chain_id=POLYGON
-                  )
-                  
-                  # 设置API凭据
-                  print("设置API凭据...")
-                  creds = load_api_credentials()
-                  client.set_api_creds(creds)
-                  
-                  print(f"客户端初始化成功，地址: {client.address if hasattr(client, 'address') else '未知'}")
-                  return client
-              except Exception as e:
-                  print(f"初始化客户端时出错: {str(e)}")
-                  import traceback
-                  print(traceback.format_exc())
-                  return None
+def get_client(private_key=None):
+    \"\"\"
+    初始化并返回Polymarket客户端
+    \"\"\"
+    # 配置客户端
+    host = \"https://clob.polymarket.com\"
+    
+    # 使用环境变量或直接设置的私钥
+    key = private_key or os.environ.get(\"PRIVATE_KEY\")
+    
+    try:
+        # 初始化客户端
+        print(\"正在初始化Polymarket客户端...\")
+        client = ClobClient(
+            host=host,
+            key=key,
+            chain_id=POLYGON
+        )
+        
+        # 设置API凭据
+        print(\"设置API凭据...\")
+        creds = load_api_credentials()
+        client.set_api_creds(creds)
+        
+        print(f\"客户端初始化成功，地址: {client.address if hasattr(client, 'address') else '未知'}\")
+        return client
+    except Exception as e:
+        print(f\"初始化客户端时出错: {str(e)}\")
+        import traceback
+        print(traceback.format_exc())
+        return None
 
-          def safe_json_dump(obj):
-              """安全地将对象转换为JSON字符串"""
-              try:
-                  return json.dumps(obj, indent=2)
-              except (TypeError, OverflowError):
-                  # 如果对象不能直接序列化为JSON
-                  if isinstance(obj, (list, tuple)):
-                      # 尝试一个元素一个元素地序列化
-                      result = []
-                      for i, item in enumerate(obj):
-                          if i >= 3:  # 只显示前3个元素
-                              result.append("... (更多项目)")
-                              break
-                          try:
-                              result.append(f"{item}")
-                          except:
-                              result.append("无法序列化的项目")
-                      return str(result)
-                  else:
-                      # 返回对象的字符串表示
-                      return str(obj)
+def safe_json_dump(obj):
+    \"\"\"安全地将对象转换为JSON字符串\"\"\"
+    try:
+        return json.dumps(obj, indent=2)
+    except (TypeError, OverflowError):
+        # 如果对象不能直接序列化为JSON
+        if isinstance(obj, (list, tuple)):
+            # 尝试一个元素一个元素地序列化
+            result = []
+            for i, item in enumerate(obj):
+                if i >= 3:  # 只显示前3个元素
+                    result.append(\"... (更多项目)\")
+                    break
+                try:
+                    result.append(f\"{item}\")
+                except:
+                    result.append(\"无法序列化的项目\")
+            return str(result)
+        else:
+            # 返回对象的字符串表示
+            return str(obj)
 
-          def list_available_methods(client):
-              """列出客户端可用的所有方法"""
-              print("\n=== 可用的客户端方法 ===")
-              methods = [method for method in dir(client) if not method.startswith('_')]
-              methods.sort()  # 按字母顺序排序
-              
-              # 按类别组织方法
-              categories = {
-                  "订单相关": ["create_order", "post_order", "cancel_order", "get_orders", "get_order_book"],
-                  "市场相关": ["get_markets", "get_price", "get_prices"],
-                  "账户相关": ["get_balances", "get_portfolio", "get_positions", "get_user", "get_user_trades"],
-                  "其他方法": []
-              }
-              
-              # 对方法进行分类
-              categorized_methods = set()
-              for category, method_list in categories.items():
-                  print(f"\n{category}:")
-                  for method in method_list:
-                      if method in methods:
-                          print(f"  - {method}")
-                          categorized_methods.add(method)
-              
-              # 显示未分类的方法
-              uncategorized = [m for m in methods if m not in categorized_methods]
-              if uncategorized:
-                  print("\n其他未分类方法:")
-                  for method in uncategorized:
-                      print(f"  - {method}")
+def list_available_methods(client):
+    \"\"\"列出客户端可用的所有方法\"\"\"
+    print(\"\\n=== 可用的客户端方法 ===\")
+    methods = [method for method in dir(client) if not method.startswith('_')]
+    methods.sort()  # 按字母顺序排序
+    
+    for method in methods:
+        print(f\"- {method}\")
 
-          def explore_account_info(client):
-              """探索账户相关信息"""
-              print("\n=== 账户相关信息 ===")
-              
-              # 获取用户信息
-              if hasattr(client, 'get_user'):
-                  try:
-                      print("\n获取用户信息...")
-                      user_info = client.get_user()
-                      print(f"用户信息: {safe_json_dump(user_info)}")
-                  except Exception as e:
-                      print(f"获取用户信息失败: {str(e)}")
-              
-              # 获取余额信息
-              if hasattr(client, 'get_balances'):
-                  try:
-                      print("\n获取账户余额...")
-                      balances = client.get_balances()
-                      print(f"余额信息: {safe_json_dump(balances)}")
-                  except Exception as e:
-                      print(f"获取余额信息失败: {str(e)}")
-              
-              # 获取持仓信息 - 尝试多种可能的方法
-              position_methods = ['get_portfolio', 'get_positions', 'get_user_positions', 'portfolio']
-              for method_name in position_methods:
-                  if hasattr(client, method_name):
-                      try:
-                          print(f"\n尝试通过 {method_name} 获取持仓信息...")
-                          positions = getattr(client, method_name)()
-                          print(f"持仓信息: {safe_json_dump(positions)}")
-                      except Exception as e:
-                          print(f"通过 {method_name} 获取持仓信息失败: {str(e)}")
+def explore_api(client):
+    \"\"\"探索API功能\"\"\"
+    if not client:
+        print(\"客户端未初始化，无法探索API\")
+        return
+    
+    try:
+        print(\"\\n=== 探索API功能 ===\")
+        
+        # 尝试所有客户端方法
+        methods = [method for method in dir(client) if not method.startswith('_') and callable(getattr(client, method))]
+        
+        for method_name in methods:
+            try:
+                print(f\"\\n尝试调用方法: {method_name}\")
+                
+                # 跳过需要参数的方法
+                if method_name in ['create_order', 'post_order', 'get_order_book', 'get_price', 'cancel_order']:
+                    print(f\"跳过需要参数的方法: {method_name}\")
+                    continue
+                
+                # 调用无参数方法
+                result = getattr(client, method_name)()
+                print(f\"{method_name}返回类型: {type(result)}\")
+                print(f\"{method_name}返回数据: {safe_json_dump(result)}\")
+                
+            except Exception as e:
+                print(f\"调用{method_name}方法时出错: {str(e)}\")
+    
+    except Exception as e:
+        print(f\"探索API时出错: {str(e)}\")
+        import traceback
+        print(traceback.format_exc())
 
-          def explore_market_info(client):
-              """探索市场相关信息"""
-              print("\n=== 市场相关信息 ===")
-              
-              # 获取市场列表
-              if hasattr(client, 'get_markets'):
-                  try:
-                      print("\n获取市场列表...")
-                      markets = client.get_markets()
-                      print(f"市场数据类型: {type(markets)}")
-                      
-                      # 如果markets是字典类型
-                      if isinstance(markets, dict):
-                          print(f"市场数量: {len(markets)}")
-                          # 显示部分市场数据
-                          count = 0
-                          for market_id, market_data in markets.items():
-                              if count >= 3:  # 只显示前3个市场
-                                  break
-                              print(f"市场ID: {market_id}")
-                              print(f"市场数据: {safe_json_dump(market_data)}")
-                              count += 1
-                      
-                      # 如果markets是列表类型
-                      elif isinstance(markets, list):
-                          print(f"市场数量: {len(markets)}")
-                          # 显示部分市场数据
-                          for i, market in enumerate(markets[:3]):  # 只显示前3个市场
-                              print(f"市场 {i+1}: {safe_json_dump(market)}")
-                      
-                      # 其他类型
-                      else:
-                          print(f"市场信息: {safe_json_dump(markets)}")
-                              
-                  except Exception as e:
-                      print(f"获取市场列表失败: {str(e)}")
-              
-              # 获取特定token的价格
-              sample_token_id = "71321045679252212594626385532706912750332728571942532289631379312455583992563"
-              
-              if hasattr(client, 'get_price'):
-                  try:
-                      print(f"\n获取token价格 (token_id: {sample_token_id})...")
-                      price = client.get_price(token_id=sample_token_id, side=BUY)
-                      print(f"买入价格: {price}")
-                      
-                      price = client.get_price(token_id=sample_token_id, side=SELL)
-                      print(f"卖出价格: {price}")
-                  except Exception as e:
-                      print(f"获取价格失败: {str(e)}")
-              
-              # 获取订单簿
-              if hasattr(client, 'get_order_book'):
-                  try:
-                      print(f"\n获取订单簿 (token_id: {sample_token_id})...")
-                      orderbook = client.get_order_book(sample_token_id)
-                      print(f"订单簿: {safe_json_dump(orderbook)}")
-                  except Exception as e:
-                      print(f"获取订单簿失败: {str(e)}")
+def main():
+    \"\"\"主函数\"\"\"
+    print(\"=== Polymarket API探索工具 ===\")
+    print(f\"当前时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\")
+    
+    # 初始化客户端
+    client = get_client()
+    
+    if client:
+        # 列出可用方法
+        list_available_methods(client)
+        
+        # 探索API功能
+        explore_api(client)
+        
+        print(\"\\n探索完成，详细信息请查看上面的输出\")
+    else:
+        print(\"客户端初始化失败，无法继续探索API\")
 
-          def explore_orders_and_trades(client):
-              """探索订单和交易相关信息"""
-              print("\n=== 订单和交易信息 ===")
-              
-              # 获取用户订单
-              if hasattr(client, 'get_orders'):
-                  try:
-                      print("\n获取用户订单...")
-                      orders = client.get_orders()
-                      print(f"订单信息: {safe_json_dump(orders)}")
-                  except Exception as e:
-                      print(f"获取用户订单失败: {str(e)}")
-              
-              # 获取用户交易历史
-              trade_methods = ['get_trades', 'get_user_trades']
-              for method_name in trade_methods:
-                  if hasattr(client, method_name):
-                      try:
-                          print(f"\n尝试通过 {method_name} 获取交易历史...")
-                          trades = getattr(client, method_name)()
-                          print(f"交易历史: {safe_json_dump(trades)}")
-                      except Exception as e:
-                          print(f"通过 {method_name} 获取交易历史失败: {str(e)}")
-
-          def main():
-              """主函数"""
-              print("=== Polymarket API探索工具 ===")
-              print(f"当前时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-              
-              # 初始化客户端
-              client = get_client()
-              
-              if client:
-                  # 列出可用方法
-                  list_available_methods(client)
-                  
-                  # 探索账户信息
-                  explore_account_info(client)
-                  
-                  # 探索市场信息
-                  explore_market_info(client)
-                  
-                  # 探索订单和交易信息
-                  explore_orders_and_trades(client)
-                  
-                  print("\n探索完成，详细信息请查看上面的输出")
-              else:
-                  print("客户端初始化失败，无法继续探索API")
-
-          if __name__ == "__main__":
-              main()
-          EOF
+if __name__ == \"__main__\":
+    main()
+'''
+with open('explore_api.py', 'w') as f:
+    f.write(script)
+          "
           
       - name: Run API exploration script
         env:
