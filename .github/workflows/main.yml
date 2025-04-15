@@ -26,11 +26,262 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install requests
-          
-      - name: Generate API Key
+      
+      - name: Create API key generation script
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
         run: |
-          # 修改脚本使用环境变量中的私钥
-          sed -i "s/PRIVATE_KEY = \".*\"/PRIVATE_KEY = \"$PRIVATE_KEY\"/" python-client/create_api_key.py
+          mkdir -p python-client
+          cat > python-client/create_api_key.py << 'EOF'
+          #!/usr/bin/env python3
+          import os
+          import requests
+          import json
+          import time
+          import subprocess
+          import tempfile
+          
+          # 设置私钥和API端点
+          PRIVATE_KEY = "PLACEHOLDER_KEY"  # 将被替换为环境变量中的值
+          CLOB_ENDPOINT = "https://clob.polymarket.com"
+          CHAIN_ID = 137  # Polygon
+          
+          # 使用Node.js和ethers.js进行EIP-712签名
+          def sign_eip712_with_node(private_key, domain, types, value):
+              # 创建临时JavaScript文件
+              with tempfile.NamedTemporaryFile(suffix='.js', delete=False, mode='w') as f:
+                  js_code = f"""
+                  // 使用Node.js环境中安装的ethers
+                  const ethers = require('ethers');
+                  
+                  async function signMessage() {{
+                      try {{
+                          const privateKey = "{private_key}";
+                          
+                          // 创建钱包（ethers v6的方式）
+                          const wallet = new ethers.Wallet(privateKey);
+                          const address = wallet.address;
+                          console.log("钱包地址:", address);
+                          
+                          // 手动添加地址到value对象
+                          const domain = {json.dumps(domain)};
+                          const types = {json.dumps(types)};
+                          const value = {json.dumps(value)};
+                          
+                          // 更新value中的地址字段
+                          value.address = address;
+                          
+                          // 使用ethers v6 signTypedData方法
+                          const signature = await wallet.signTypedData(domain, types, value);
+                          
+                          console.log(JSON.stringify({{
+                              signature,
+                              address
+                          }}));
+                      }} catch (error) {{
+                          console.error(error.message);
+                          console.error(error.stack);
+                          process.exit(1);
+                      }}
+                  }}
+                  
+                  signMessage();
+                  """
+                  f.write(js_code)
+                  js_file_path = f.name
+              
+              # 获取ethers.js的路径
+              node_modules_path = subprocess.run(['npm', 'root'], 
+                                               capture_output=True, 
+                                               text=True).stdout.strip()
+              
+              try:
+                  # 执行Node.js脚本，添加NODE_PATH环境变量
+                  env = os.environ.copy()
+                  env['NODE_PATH'] = node_modules_path
+                  
+                  print(f"使用NODE_PATH: {node_modules_path}")
+                  
+                  result = subprocess.run(['node', js_file_path], 
+                                      capture_output=True, 
+                                      text=True,
+                                      env=env)
+                  
+                  os.unlink(js_file_path)  # 删除临时文件
+                  
+                  if result.returncode != 0:
+                      print(f"Node.js脚本执行失败: {result.stderr}")
+                      return None, None
+                  
+                  print(f"Node.js脚本输出: {result.stdout}")
+                  
+                  # 解析JSON结果
+                  try:
+                      data = json.loads(result.stdout.strip().split('\n')[-1])
+                      return data["signature"], data["address"]
+                  except json.JSONDecodeError as e:
+                      print(f"JSON解析错误: {e}")
+                      print(f"原始输出: {result.stdout}")
+                      return None, None
+                      
+              except Exception as e:
+                  print(f"执行签名脚本失败: {str(e)}")
+                  if os.path.exists(js_file_path):
+                      os.unlink(js_file_path)
+                  return None, None
+          
+          def generate_l1_auth_headers():
+              """
+              生成L1认证头（基于私钥签名）
+              """
+              timestamp = str(int(time.time()))
+              nonce = "0"
+              
+              # 构建EIP-712域
+              domain = {
+                  "name": "ClobAuthDomain",
+                  "version": "1",
+                  "chainId": CHAIN_ID
+              }
+              
+              # 构建EIP-712类型
+              types = {
+                  "ClobAuth": [
+                      {"name": "address", "type": "address"},
+                      {"name": "timestamp", "type": "string"},
+                      {"name": "nonce", "type": "uint256"},
+                      {"name": "message", "type": "string"}
+                  ]
+              }
+              
+              # 构建要签名的数据
+              value = {
+                  "address": "", # 将由JS脚本在签名前填充
+                  "timestamp": timestamp,
+                  "nonce": nonce,
+                  "message": "This message attests that I control the given wallet"
+              }
+              
+              # 使用ethers.js签名
+              signature, address = sign_eip712_with_node(PRIVATE_KEY, domain, types, value)
+              
+              if not signature or not address:
+                  print("无法生成签名")
+                  return {}
+              
+              print(f"钱包地址: {address}")
+              print(f"生成签名: {signature}")
+              
+              # 返回L1认证头
+              return {
+                  'POLY_ADDRESS': address,
+                  'POLY_SIGNATURE': signature,
+                  'POLY_TIMESTAMP': timestamp,
+                  'POLY_NONCE': nonce,
+                  'POLY_METHOD': 'POST',
+                  'Content-Type': 'application/json'
+              }
+          
+          def create_api_key():
+              """
+              创建API密钥
+              """
+              url = f"{CLOB_ENDPOINT}/auth/api-key"
+              headers = generate_l1_auth_headers()
+              
+              if not headers:
+                  print("生成认证头失败，无法创建API密钥")
+                  return None
+              
+              print("正在创建API密钥...")
+              print(f"请求URL: {url}")
+              print(f"认证头: {json.dumps(headers, indent=2)}")
+              
+              try:
+                  response = requests.post(url, headers=headers)
+                  print(f"响应状态码: {response.status_code}")
+                  print(f"响应内容: {response.text}")
+                  
+                  if response.status_code == 200:
+                      try:
+                          result = response.json()
+                          print("API密钥创建成功!")
+                          print(f"API密钥: {result.get('apiKey')}")
+                          print(f"Secret: {result.get('secret')}")
+                          print(f"Passphrase: {result.get('passphrase')}")
+                          
+                          # 保存到文件
+                          with open("polymarket_api_key.json", "w") as f:
+                              json.dump(result, f, indent=2)
+                          print("API密钥已保存到 polymarket_api_key.json 文件")
+                          
+                          return result
+                      except json.JSONDecodeError:
+                          print(f"响应不是有效的JSON格式: {response.text}")
+                  else:
+                      print(f"创建API密钥失败: 状态码 {response.status_code}")
+                      print(f"响应内容: {response.text}")
+              except Exception as e:
+                  print(f"请求异常: {str(e)}")
+          
+          def derive_api_key():
+              """
+              派生API密钥
+              """
+              url = f"{CLOB_ENDPOINT}/auth/derive-api-key"
+              headers = generate_l1_auth_headers()
+              
+              if not headers:
+                  print("生成认证头失败，无法派生API密钥")
+                  return None
+              
+              headers['POLY_METHOD'] = 'GET'  # 修改METHOD为GET
+              
+              print("正在派生API密钥...")
+              print(f"请求URL: {url}")
+              print(f"认证头: {json.dumps(headers, indent=2)}")
+              
+              try:
+                  response = requests.get(url, headers=headers)
+                  print(f"响应状态码: {response.status_code}")
+                  print(f"响应内容: {response.text}")
+                  
+                  if response.status_code == 200:
+                      try:
+                          result = response.json()
+                          print("API密钥派生成功!")
+                          print(f"API密钥: {result.get('apiKey')}")
+                          print(f"Secret: {result.get('secret')}")
+                          print(f"Passphrase: {result.get('passphrase')}")
+                          
+                          # 保存到文件
+                          with open("polymarket_derived_api_key.json", "w") as f:
+                              json.dump(result, f, indent=2)
+                          print("派生的API密钥已保存到 polymarket_derived_api_key.json 文件")
+                          
+                          return result
+                      except json.JSONDecodeError:
+                          print(f"响应不是有效的JSON格式: {response.text}")
+                  else:
+                      print(f"派生API密钥失败: 状态码 {response.status_code}")
+                      print(f"响应内容: {response.text}")
+              except Exception as e:
+                  print(f"请求异常: {str(e)}")
+          
+          if __name__ == "__main__":
+              print("=== Polymarket API密钥生成工具 ===")
+              print("1. 尝试创建新的API密钥")
+              result = create_api_key()
+              
+              if not result:
+                  print("\n2. 尝试派生现有API密钥")
+                  derive_api_key()
+          EOF
+          
+          # 替换占位符为实际私钥
+          sed -i "s/PLACEHOLDER_KEY/$PRIVATE_KEY/" python-client/create_api_key.py
+          chmod +x python-client/create_api_key.py
+          
+      - name: Generate API Key
+        run: |
           python python-client/create_api_key.py
