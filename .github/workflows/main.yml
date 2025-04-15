@@ -1,0 +1,36 @@
+name: Generate Polymarket API Key
+
+on:
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  generate-key:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          
+      - name: Install ethers.js
+        run: npm install ethers
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+          
+      - name: Generate API Key
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        run: |
+          # 修改脚本使用环境变量中的私钥
+          sed -i "s/PRIVATE_KEY = \".*\"/PRIVATE_KEY = \"$PRIVATE_KEY\"/" python-client/create_api_key.py
+          python python-client/create_api_key.py
